@@ -1,0 +1,176 @@
+Optimization Area,AWS Redshift,Azure Synapse,Google BigQuery,Snowflake,Teradata
+Data Distribution,KEY/ALL/EVEN distribution styles,"HASH, ROUND_ROBIN, REPLICATE",Automatic (not user-defined),"Automatic, user doesn't control","Primary Index (UPI/NUPI), Join Index, Secondary Index"
+Partitioning,Sort Keys & Table Partitioning (limited),Partitioning with RANGE or LIST,Partitioning on ingestion time or column,"Automatic micro-partitioning, clustering for control",Partitioned Primary Index (PPI)
+Indexing,No traditional indexes; relies on sort/dist keys,"Clustered Columnstore Index (CCI), Clustered Index",No indexes; use clustering for optimization,No indexes; clustering keys supported,"Secondary Indexes, Join Indexes"
+Statistics Management,ANALYZE command required manually,UPDATE STATISTICS manually,Automatic statistics collection,Managed automatically,COLLECT STATISTICS required
+Query Optimization,"Predicate pushdown, avoid SELECT *, JOIN optimization","Data movement minimization, join pruning, push filters early","Filter early, avoid SELECT *, use approximate functions","Pruning, result cache, filter pushdown, join elimination","Join planning, derived table reuse, use of Volatile Tables"
+Compression,Columnar compression with encoding,"Columnar storage, built-in compression","Automatic, columnar format (Capacitor)",Automatic on columnar storage,"Block-level compression, multi-value compression"
+Materialized Views / Caching,Materialized Views supported,Materialized Views available,Caching enabled for 24 hours,Automatic result and metadata cache,"Yes, using join indexes or summary tables"
+Concurrency Scaling,Concurrency scaling available,"Yes, with workload isolation via resource classes",High concurrency by design,Multi-cluster warehouse for scaling,Optimized AMP parallelism
+Cost-Based Optimization,"Yes, via Redshift Optimizer",Cost-based with statistics support,"Yes, with dynamic optimization","Yes, with auto tuning and pruning","Yes, depends heavily on statistics"
+Monitoring Tools,"Query logs, STL/SVL tables, Advisor","Synapse Studio, DMVs, EXPLAIN","Query Plan UI, INFORMATION_SCHEMA tables","Query History, Query Profile","DBQL, ResUsage, Viewpoint, EXPLAIN"
+,,,,,
+Drop zones ,,,,,
+Platform,Redshift,Synapse,BigQuery,Snowflake,Teradata
+Cloud-Native Drop Zone,S3,ADLS/Blob,GCS,Internal/External Stage,No native drop zone
+Auto-Ingest Capable,Via Lambda/SNS,Event Grid + Synapse Pipelines,Event trigger + Cloud Function,Yes (Snowpipe),Limited
+Best for,Batch Loads,Structured data loading,"Serverless, scalable loading","Fast, auto-scaling ingestion",Traditional ETL/BI stacks
+,,,,,
+schema evolution,Redshift,Synapse,BigQuery,Snowflake,Teradata
+? Add Columns,?? Supported manually,?? Supported manually,?? Supported during load and via UI/API,?? Supported via ALTER TABLE,?? Supported via ALTER TABLE
+? Drop Columns,?? Not supported directly (workaround via CREATE TABLE AS),?? Not directly supported in dedicated SQL pool,?? Fully supported,?? Supported via ALTER TABLE DROP COLUMN,"?? Not directly, requires table recreation"
+?? Change Data Types,? Not supported (must recreate table),?? Limited; often requires new table,?? Limited; may require copy job,"?? Some changes allowed; else, recreate required",? Not supported; recreate table
+?? Auto Schema Detection (from files),? Not supported (manual schema required),?? Limited (in Data Flows or ADF),"?? Fully supported for Avro, Parquet, JSON, CSV",?? Limited via INFER_SCHEMA() for semi-structured data,? Not supported
+?? Evolving Nested Structures,? Not supported,? Not supported,?? Supported with STRUCTs and REPEATED fields,?? Semi-structured support via VARIANT,? Not supported
+?? Partition Column Evolution,? Must recreate table,? Not supported,? Partition column can't be modified,?? Cluster key changes require re-clustering,? Not supported
+??? Schema Merging (During Load),? Not supported,? Not supported,?? Supported via AUTO_DETECT=TRUE and schema merge,?? Possible via COPY INTO with relaxed matching,? Not supported
+?? DDL Automation Tools,"Glue, DMS, custom scripts","ADF, Synapse Pipelines","Native support, Dataflow, Cloud Composer","Streams & Tasks, Snowpipe","TPT, FastLoad, Informatica"
+,,,,,
+schema drift handling,,,,,
+Feature,Redshift,Synapse,BigQuery,Snowflake,Teradata
+Automatic Schema Drift Handling,? Not supported,?? Partially supported in Data Flows,? Fully supported with schema auto-detect,?? Limited support using COPY INTO options,? Not supported
+Add New Columns at Load Time,? Must alter table or recreate,?? ADF allows some flexibility,? New fields can be merged during load,?? Requires staging and scripting,? Must manually alter or recreate tables
+Remove Missing Columns at Load Time,? Load fails if column missing,?? May require mapping updates,? Skips columns not in target schema,?? Skipped via matching strategy,? Load fails or must be redesigned
+Nested / Repeated Schema Changes,? Not supported,? Not supported,? STRUCT/RECORD changes handled gracefully,? VARIANT/OBJECT types support changes,? Not supported
+Flexible Column Mapping,? Strict schema match,?? With ADF mapping data flows,"? Yes, schema mapping and merge",? Via COPY INTO ... MATCH_BY_COLUMN_NAME,? No column mapping flexibility
+Schema Evolution Logging,Manual effort,ADF logs or Azure Monitor,? Built-in in load job metadata,? Available in COPY INTO query history,? Manual effort
+Use Cases Where Drift is Handled Well,None,ADF pipelines with JSON/Parquet,"Batch loads, streaming inserts, external data","Semi-structured JSON ingestion, Snowpipe",Only possible via full control in ETL tools
+,,,,,
+Manual Schema drift Handling Techniques,,,,,
+Feature / Step,Redshift,Synapse,BigQuery,Snowflake,Teradata
+Step 1: Schema Detection,Use Python/Glue to infer schema from files in S3,Use ADF/Databricks to detect schema,"bq show, or autoDetect=true in GCS loads",Infer schema using VARIANT or INFER_SCHEMA(),Use BTEQ or ETL tools to inspect source file
+Step 2: Retrieve Target Schema,Query information_schema.columns,Query sys.columns or metadata in ADF,Query INFORMATION_SCHEMA.COLUMNS,Use DESC TABLE or query information_schema,Query dbc.columns
+Step 3: Schema Comparison,Use Python dict/set logic,Compare schemas in ADF Data Flows,"BigQuery supports schema merge, log changes",Custom logic to map source to target columns,Manual column comparison via control table
+Step 4: Intermediate Staging,Create raw staging table in Redshift,Use staging table in dedicated SQL pool,Load to staging table with relaxed schema,Stage data in table or VARIANT column,Land into flat file/table via FastLoad
+Step 5: Transform to Target,Use SQL/Python to CAST and align fields,Use derived columns and data flow mapping,"Use SELECT * REPLACE, or flatten STRUCTs","Use SELECT ... with alias, or FLATTEN",ETL logic with SAS/Informatica transformations
+Step 6: Add Missing Columns,ALTER TABLE ADD COLUMN manually,Use ALTER TABLE in SQL Pool,"Automatically handled, or via ALTER TABLE",Use ALTER TABLE ADD COLUMN,Manually add with ALTER TABLE
+Step 7: Remove Extra Columns,Exclude in SELECT or recreate table,Use mapping to skip,Auto-skipped if not in target,"Skip in COPY INTO, use column match setting",Recreate table without extra columns
+Step 8: Type Conversion,Explicit CAST in SQL,Explicit CAST using Derived Column,Auto-converts some types,CAST in SELECT or ALTER COLUMN,CAST in INSERT/SELECT
+Step 9: Logging / Alerting,CloudWatch or Airflow log with schema diff,ADF pipeline logs + Azure Monitor,Load job metadata includes schema change,"Use Streams, Tasks or query history logging",Manual logging with job scripts
+,,,,,
+how to flatten JSON or semi-structured data,,,,,
+Feature / DB,Redshift,Synapse,BigQuery,Snowflake,Teradata
+Supports Semi-structured Data?,? Limited JSON support,?? Partial (using OPENJSON in dedicated pools),"? Full support for JSON, Avro, Parquet",? Full support via VARIANT data type,?? Basic JSON support (requires pre-processing)
+File Formats Supported,"JSON, Avro, CSV, Parquet","JSON, Parquet, CSV","JSON, Avro, Parquet, ORC","JSON, Avro, Parquet, XML",JSON (via external tools)
+Native Semi-Structured Type,? No (uses SUPER only in RA3 nodes),? No true native type,"? Yes (RECORD/STRUCT, ARRAY)",? VARIANT (can store nested structures),? No
+Flatten Function/Method,"json_extract_path_text, SUPER + UNNEST (RA3)","OPENJSON, CROSS APPLY","UNNEST, WITH OFFSET, dot notation access",FLATTEN() table function,"Use REGEXP_SUBSTR, UDFs, or preprocess"
+Example to Flatten JSON,"SELECT json_extract_path_text(json, 'key')",SELECT * FROM OPENJSON(@json)...,"SELECT id, val FROM t, UNNEST(array_field)","SELECT f.value:key FROM TABLE, LATERAL FLATTEN(INPUT => json_col) f","No built-in flatten, use SAS/Informatica"
+JSON Path Support,? Partial,? Yes,? Yes,? Full JSON path support,? Manual handling
+Performance on Nested Data,?? Slower unless using SUPER & RA3,?? Not optimized,"? Excellent (columnar, native JSON functions)",? Excellent with clustering/pruning on VARIANT,? Poor unless transformed before ingest
+Joins with Flattened Data,? With lateral joins (RA3 only),? Using APPLY and OPENJSON,? Seamless using UNNEST,? LATERAL FLATTEN joins supported,?? Requires full transformation
+Ideal Use Case,RA3 with SUPER for semi-structured workloads,Small JSON payloads in ADF pipelines,Analytics on large semi-structured datasets,"Complex nested JSON (e.g., event logs, IoT)",Structured workloads only
+,,,,,
+Debuggng long running Queries,,,,,
+Debugging Aspect,Redshift,Synapse,BigQuery,Snowflake,Teradata
+Execution Plan,"Use EXPLAIN, SVL_QUERY_REPORT, STL_EXPLAIN","Use EXPLAIN, sys.dm_pdw_exec_requests, query plan XML","Built-in Query Plan UI, EXPLAIN","Use EXPLAIN PLAN, Query Profile in UI","Use EXPLAIN command, Visual Explain, DBQL"
+Monitor Query Progress,"Query STL_WLM_QUERY, SVL_QLOG","sys.dm_pdw_exec_requests, sys.dm_pdw_request_steps","Job history in UI, INFORMATION_SCHEMA.JOBS_BY_USER","UI Query History, QUERY_HISTORY() view","DBC.QryLog, DBC.DBQLogTbl for active query analysis"
+Wait Events/Stages,"STL_WLM_QUERY, STL_QUERY_METRICS (wait_time, queue_time)","dm_pdw_wait_stats, ADF monitoring logs","Stage-level breakdown (Slot time, Wait time, Read/Write time)",Detailed stages in Query Profile,"ResUsage tables, AMP utilization metrics"
+Query Tuning Tips,- Avoid CROSS JOINs- Use DIST/SORT keys correctly- Avoid SELECT *,- Distribute data properly- Use CTAS for optimization,- Avoid SELECT *- Cluster tables- Filter early- Use approximate functions,- Avoid functions blocking pruning- Use clustering on large VARIANTs,- Optimize PI/Secondary Indexes- Collect stats
+Concurrency Monitoring,"WLM queues: STL_WLM_QUERY, STL_WLM_SERVICE_CLASS_CONFIG","Resource classes, workload isolation",Concurrency is auto-scaled but viewable via Job logs,Multi-cluster virtual warehouses automatically scale,"View concurrency via DBQL, ResUsageSP"
+Query History Access,"SVL_QLOG, STL_QUERY, STL_QUERY_METRICS","Synapse Studio, T-SQL dynamic views","UI console, INFORMATION_SCHEMA.JOBS",Query History UI & TABLE(QUERY_HISTORY()),"DBC.DBQLogTbl, Viewpoint"
+Heavy Join Debugging,Check join order in EXPLAIN and SVL_QUERY_SUMMARY,Track data movement with dm_pdw_request_steps,Analyze join stages and shuffle operations in query plan,Query Profile shows join order and cluster pruning,"EXPLAIN, HASH JOIN, MERGE JOIN indicators"
+Table Statistics Check,"ANALYZE, and check encoding/compression settings","UPDATE STATISTICS, sys.stats",Auto-collected; can review via UI or SQL,Auto-managed; clustering info helps pruning,Must run COLLECT STATISTICS manually
+Disk/IO Bottleneck Checks,"Monitor diskqueue_depth, read_latency from STL_DISK_*",Azure Monitor or sys.dm_pdw_* metrics,View slot contention in job graph,Query Profile shows IO bottlenecks,"Use ResUsageSP, Viewpoint, log cache usage"
+Index/Sort Analysis,"Review sort keys, dist keys, compression using PG_TABLE_DEF","sp_helpindex, clustered indexes",Use clustering statistics in table info,Review clustering keys & micro-partitions in metadata,Review index usage from query plans
+,,,,,
+Behavior When Only Column Names Are Changed,,,,,
+Platform,Redshift (COPY),Synapse (PolyBase / COPY),BigQuery (LOAD),Snowflake (COPY INTO),Teradata (FastLoad / BTEQ)
+Will Load Fail? (Default Behavior),? Will Fail (by default),? Will Fail (usually),?? May Succeed / Fail,?? May Succeed / Fail,? Will Fail
+Reason / Behavior,Redshift expects columns in order if not explicitly mapped,Schema mismatch with external table or staging table causes error,"If autodetect=true, BQ uses file header; but downstream table mismatch causes failure","Snowflake loads by column order, not by name, unless using named stage + schema",Rigid schema; column names and order must match
+How to Handle It,"Use COPY ... (col1, col2, ...) to explicitly map columns",Use staging table with generic names or dynamic SQL to map columns,Match column names or use schema file / external table definition,Use file format + column list or selectively map in query,Use intermediate staging table with renamed columns
+,,,,,
+Duplicate File/Data Detection Before DB Load,,,,,
+Platform,Redshift,Synapse,BigQuery,Snowflake,Teradata
+Duplicate File Detection in Drop Zone,? No built-in deduplication? Use object naming or checksums,? No built-in deduplication? Use file metadata,? Auto deduplication in streaming inserts (if insertId is used)? Not in file load,? File reuse allowed unless COPY INTO with ON_ERROR='SKIP_FILE' or metadata tracking,? No automatic check? ETL checks required manually
+Duplicate Data Detection Before Load,? No automatic deduplication unless using staging logic,? Requires checking in staging/external tables,"? Use MERGE, ROW_NUMBER(), or EXCEPT for comparison","? Use staging table + dedup logic (e.g., ROW_NUMBER() over key)",? Must perform dedup in staging or via ROW_NUMBER()
+Recommended Tools/Methods,S3 object hash + manifest filesStage table with NOT EXISTS,Azure Data Factory + staging table dedup checks,Use external table + checksum or file_name col,"Snowflake metadata: COPY_HISTORY, file name hash",Use SAS/BTEQ ETL pre-check logic or hash key check
+,,,,,
+ANSI SQL Support Comparison,,,,,
+Feature / Standard,Redshift,Synapse,BigQuery,Snowflake,Teradata
+ANSI SQL-92 Compliance,? Partial,? Partial (T-SQL-based),? High (SQL 2011 subset),? High,? Full
+Common Table Expressions (CTEs),? Yes,? Yes,? Yes,? Yes,? Yes
+Window Functions,? Yes,? Yes,? Yes,? Yes,? Yes
+MERGE/UPSERT support,? Yes (from 2021),"?? Limited (no native MERGE, workaround with CTAS)",? Yes,? Yes,? Yes
+Recursive CTEs,? No,? Yes,? Yes,? Yes (limited),? Yes
+INTERSECT / EXCEPT,? Yes,? Yes,? Yes,? Yes,? Yes
+FULL OUTER JOIN,? Yes,? Yes,? Yes,? Yes,? Yes
+Set Operations (UNION/UNION ALL),? Yes,? Yes,? Yes,? Yes,? Yes
+Stored Procedures / UDFs,? PL/pgSQL support,? T-SQL procedures,? JavaScript / SQL UDFs,? SQL/JavaScript procs,? SPL support
+JSON Functions,?? Limited,?? Basic,? Native JSON support,? VARIANT + semi-structured support,? Limited native JSON
+Data Types Support,? Good,? Good,? Very flexible,"? Rich (VARIANT, ARRAY)",? Strong
+Compliance Level Summary,? Moderate (Postgres-leaning),? T-SQL variant (SQL Server base),? Modern SQL 2011 subset,? High (standards + extensions),? Full ANSI-SQL & extensions
+,,,,,
+Comparison Table: Real-time/Micro-batch Ingestion for File Drops (Every Second),,,,,
+,,,,,
+Feature / Platform,Redshift,Synapse,BigQuery,Snowflake,Teradata
+Drop Zone,Amazon S3,Azure Data Lake / Blob,Google Cloud Storage (GCS),Amazon S3 / Azure Blob / GCS,"HDFS, Flat Files via BTEQ/FastLoad"
+Auto-Trigger Support,? (manual or via Lambda),? (ADF Event-based triggers),? (Cloud Function / Dataflow trigger),? (Snowpipe auto-ingest via cloud notifications),? (manual / cron-based scheduling)
+Streaming Support,?? (Limited - via Kinesis to staging),?? (via Event Grid + Stream Analytics),? Native streaming inserts,"?? (Snowpipe is micro-batch, not true streaming)",? (No built-in streaming)
+Recommended Trigger,Lambda on S3 ? COPY,ADF Event Trigger ? COPY,Cloud Function on GCS ? bq load,Cloud Notification ? Snowpipe auto ingest,Cron/Shell ? BTEQ or FastLoad
+Latency,~seconds with Lambda,~seconds with ADF event trigger,Near real-time (seconds),~seconds to 1 min,Minutes (batch only)
+Schema Drift Handling,? (manual via COPY column list),? (external table redefinition needed),? (with autodetect or flexible schema load),?? (manual with file format/schema enforcement),? (strict schema match required)
+File Type Recommended,"CSV, Parquet, JSON","CSV, Parquet","CSV, JSON, Avro, Parquet","CSV, JSON, Avro, Parquet",CSV only (strict)
+Staging Table Approach,? Yes (best practice),? Yes,? Optional (can load directly),? Yes (Snowpipe loads to staging),? Mandatory
+Duplicate File Handling,? (must track in manifest/log),?? Manual,? (if insertId used in streaming),? (Snowpipe tracks file ingestion history),? (must script it manually)
+Cost Efficiency,? Good with COPY batching,"?? Medium (ADF cost, overhead)",? Efficient for small JSON/parquet,? Pay-per-second usage in Snowpipe,? Inefficient for second-wise loads
+,,,,,
+ETL Tools & Usage Comparison by Cloud Data Platform,,,,,
+Cloud Data Platform,Amazon Redshift,Azure Synapse,Google BigQuery,Snowflake,Teradata
+Native / Recommended ETL Tool(s),? AWS Glue? Amazon Data Pipeline? Matillion,? Azure Data Factory (ADF)? Synapse Pipelines,? Cloud Dataflow? Cloud Composer? Data Fusion,? Snowpipe (for auto-ingest)? DBT? Fivetran? Matillion? Airflow,? Teradata Parallel Transporter (TPT)? BTEQ? Informatica
+Tool Type,Serverless / SaaS,Orchestration + Mapping Data Flows,Streaming / Orchestration / UI ETL,ELT / Streaming / Declarative,Batch / Script-Based
+How It Works (Source to Target),"1. Extract data from S3, RDS, JDBC2. Transform with Glue (PySpark/Scala)3. Load via COPY or JDBC into Redshift","1. Extract from Azure SQL, Blob, REST, on-prem via IR2. Transform via Mapping or Wrangling data flows3. Load into Synapse via PolyBase/COPY","1. Extract from GCS, Cloud SQL, Pub/Sub2. Transform via Dataflow (Apache Beam) or Data Fusion UI3. Load using bq load, streaming insert, or Dataflow sink","1. Extract to stage (S3/GCS/Blob)2. Auto-ingest or batch load via COPY INTO3. Transform using SQL, DBT models, or stored procs",1. Extract via ODBC/Flat file2. Transform using Informatica/TPT operators3. Load via TPT LOAD/UPDATE/INSERT or BTEQ scripts
+,,,,,
+Summary Table: Best Practices Comparison,,,,,
+,,,,,
+Area,Redshift,Synapse,BigQuery,Snowflake,Teradata
+Data Modeling,Use DIST/SORT keysStar Schema,Use Dedicated SQL poolsStar Schema,Star Schema preferred,Star/Snowflake SchemaClustered tables optional,Star Schema with normalized layers
+Partitioning/Clustering,DIST key for joinsSORT key for filtering,Partition + Distribution Columns,Partition + Cluster by,Micro-partitions (automatic)Clustering optional,PPI (Partitioned Primary Index)
+Loading Best Practice,Use COPY from S3Avoid small batch inserts,Use PolyBase/ADF for bulk load,Load from GCS in batchUse bq load or Dataflow,Use COPY INTO or SnowpipeUse file staging,Use TPT/BTEQ for fast parallel load
+Transformations,Use CTAS/Materialized viewsOptimize joins,Use CTAS/Stored Proc,"Use WITH, ARRAY, STRUCT, optimize joins",DBT models with CTEs/macrosStreamlined ELT,Use macros/procedures for modular logic
+Query Optimization,Analyze/Vacuum tablesUse stats,Use statisticsResult set caching,Avoid SELECT *Use partition filters,"Use clustering, avoid SELECT *Leverage RESULT_SCAN",Use collect statsJoin index
+Concurrency & Scaling,RA3 nodes for scalability,Scale via DWU,Serverless; use reservations/sharding,Multi-cluster warehouseAuto suspend/resume,Use AMP architecture wisely
+Monitoring/Debugging,"CloudWatch, STL tables, EXPLAIN",Monitor via Synapse Studio,"Query Execution Plan, Job history","Query Profile, Warehouse Monitor","DBQL (Query Log), PMON, EXPLAIN"
+Cost Management,"Compress files, use UNLOAD for archival",Use reserved capacityManage DWUs,Partitioned tablesQuery cost estimator,Monitor warehouse usageStorage vs compute separation,Schedule ETL jobs off-peak
+Security,"IAM roles, VPC, encryption at rest","RBAC, Azure AD integration","IAM roles, VPC, data masking","RBAC, masking policies, secure views","Roles, profiles, LDAP, data encryption"
+Automation/Orchestration,"AWS Glue, Airflow","Azure Data Factory, Logic Apps","Cloud Composer, Data Fusion","DBT, Airflow, Lambda, Snowpipe","Informatica, Control-M, custom shell"
+,,,,,
+ACID Compliance Comparison Table,,,,,
+,,,,,
+Feature,Amazon Redshift,Azure Synapse,Google BigQuery,Snowflake,Teradata
+Atomicity,? Supported for single statements,? Supported for single transactions,"?? Limited – atomic within DML, not multi-table",? Fully supported,? Fully supported
+Consistency,? Ensured within transaction context,? Ensured by T-SQL engine,?? Eventual for streaming? Batch,? Strong consistency enforced,? Enforced via locks & constraints
+Isolation,? Serializable isolation (default),? Snapshot Isolation,?? Not traditional – uses multi-versioning,? Multi-version concurrency control (MVCC),? Serializable and Read Committed levels
+Durability,? Data persisted via commit logs,? Durable once committed,? Data is replicated across zones,? Data is automatically committed & durable,? Durable with journaling and fallback
+Transactional Support,? Single and multi-statement transactions,? Full ACID support in dedicated SQL pool,?? DML is atomic but limited in multi-step,? Full ACID-compliant SQL engine,? Full ACID support including rollback
+Multi-statement Transactions,? Supported with BEGIN/END,? T-SQL transaction block supported,?? Limited – no BEGIN/END blocks,? Fully supported,? Fully supported
+Streaming Transactions,? Not supported,? Not supported,"?? Append-only, eventually consistent",?? Snowpipe is eventually consistent,? Not supported
+,,,,,
+Encryption at Rest & In Transit – Comparison,,,,,
+,,,,,
+Feature,Redshift,Synapse Analytics,BigQuery,Snowflake,Teradata
+Encryption at Rest,? AES-256 by default,? Transparent Data Encryption (TDE) AES-256,? Google-managed encryption (AES-256),? Always encrypted (AES-256 or FIPS 140-2),"? AES-256, TDE supported"
+Customer-Managed Keys (CMK),? Optional via KMS,? Optional via Azure Key Vault,? Optional via CMEK (Cloud KMS),"? Optional via AWS KMS, Azure Key Vault, GCP KMS",? With optional third-party tools
+Encryption in Transit,? SSL/TLS,? TLS 1.2,? TLS 1.2 or higher,? TLS 1.2+ enforced,? SSL/TLS
+Column-Level Encryption,? Not native,? Supported in SQL Server engine,? Use of functions like AEAD.ENCRYPT,? Tokenization / masking,?? Requires application-level implementation
+Data Masking / Tokenization,? Not native (can use external tools),? Dynamic Data Masking (DDM),? Supported via UDF or DLP,? Native dynamic data masking,?? Application or ETL layer masking needed
+,,,,,
+Encoding Methods Comparison,,,,,
+,,,,,
+Platform,Redshift,Synapse,BigQuery,Snowflake,Teradata
+Encoding Format Used,"Columnar encoding (LZO, ZSTD, BYTEDICT, etc.)",Columnstore encoding,Capacitor (Columnar Format),Proprietary columnar + VARIANT for semi-structured,"Block-level compression (MLC), Columnar for NOS"
+Notes,Chosen during table creation or automatically,Automatic column encoding in dedicated pools,Google’s proprietary columnar storage format with built-in encoding,Auto-optimized encoding,Can use Multi-Level Compression or Row/Column format
+Compression Techniques Comparison,,,,,
+,,,,,
+Platform,Redshift,Synapse,BigQuery,Snowflake,Teradata
+Compression,"LZO, Zstandard (ZSTD), BYTEDICT",Page-level compression,"Snappy (default), GZIP",Automatic compression (proprietary),"MLC (Multi-Level Compression), ALC"
+Notes,Chosen per column or auto-compressed,Built-in on dedicated SQL pools,"Transparent to user, efficient for JSON, CSV",Cannot be manually overridden,Advanced compression with optional dictionary encoding
+,,,,,
+,,,,,
+Access Control Comparison Table,,,,,
+Access Control Feature,Redshift,Synapse Analytics,BigQuery,Snowflake,Teradata
+Row-Level Security (RLS),? Policy-based (PostgreSQL-style),? Built-in in Dedicated SQL Pools,? Authorized views / RLS policies,? Row Access Policies (fully supported),? Row-level security via views or policies
+Column-Level Security (CLS),?? Workaround via views,? Column-level permissions (T-SQL GRANT),? Fine-grained via authorized views,? Dynamic Data Masking & Access Control,? Column-level access via views or roles
+Role-Based Access Control,? Uses PostgreSQL GRANT model,? Fully supported via T-SQL roles,? IAM roles & permissions,? Fully featured RBAC with granular scopes,"? Roles, users, profiles, LDAP support"
+Dynamic Data Masking,? Not native (workaround via views),? Supported,?? Via UDF or DLP integration,? Built-in DDM for sensitive fields,?? Requires UDFs or external logic
+Policy Auditing & Logging,? CloudTrail + STL tables,? Azure Monitor / Log Analytics,? Audit logs via Cloud Logging,? Access History views + object-level logging,? DBQL + Access Logging + Viewpoint
+,,,,,
