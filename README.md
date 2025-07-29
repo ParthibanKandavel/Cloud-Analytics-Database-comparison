@@ -1,3 +1,5 @@
+**"Note : Download this file for complete readability"**
+
 covered knowledge of below points related to Cloud Analytics Databases.
 **Optimization Area**
 Data Distribution
